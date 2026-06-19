@@ -1,0 +1,15 @@
+Flask==3.0.3
+gunicorn==22.0.0
+google-genai==2.8.0
+groq==1.4.0
+scikit-fuzzy==0.5.0
+scipy==1.13.1
+pandas==2.2.2
+numpy==1.26.4
+plotly==5.22.0
+matplotlib==3.9.0
+networkx==3.3
+google-cloud-storage==2.18.2
+google-cloud-tasks==2.16.4
+requests==2.32.3
+reportlab==4.2.2

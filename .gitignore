@@ -1,0 +1,51 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+
+# Python caches and environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables, credentials, and local secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*secret*
+*credential*
+*password*
+*token*
+
+# Local datasets, generated data, databases, models, and archives
+*.csv
+*.tsv
+*.db
+*.sqlite
+*.sqlite3
+*.pkl
+*.joblib
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+boot_ga.json
+validation_holdout_index.json
+
+# Project-specific private local link file
+link of dashboard.txt

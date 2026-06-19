@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Access · Malaysian Loan Approval System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0f172a;
+      font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#e2e8f0;padding:24px}
+    .lock-card{width:100%;max-width:380px;background:#111c33;border:1px solid rgba(255,255,255,.08);
+      border-radius:20px;padding:30px 28px;box-shadow:0 30px 70px rgba(0,0,0,.45)}
+    .brand{width:46px;height:46px;border-radius:13px;border:1px solid rgba(45,212,191,.45);
+      background:rgba(20,184,166,.14);display:flex;align-items:center;justify-content:center;
+      font-weight:800;color:#ccfbf1;margin-bottom:16px}
+    h1{margin:0 0 6px;font-size:20px;font-weight:800;color:#f8fafc}
+    p{margin:0 0 18px;font-size:13.5px;line-height:1.55;color:#94a3b8}
+    .err{display:none;margin:0 0 14px;padding:10px 12px;border-radius:11px;
+      background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#fecaca;font-size:12.5px;font-weight:650}
+    input{width:100%;border:1px solid rgba(255,255,255,.14);background:#0b1426;color:#f8fafc;
+      border-radius:12px;padding:12px 14px;font:inherit;outline:none}
+    input:focus{border-color:#2dd4bf;box-shadow:0 0 0 4px rgba(45,212,191,.14)}
+    button{width:100%;margin-top:12px;border:0;border-radius:12px;padding:12px 14px;font:inherit;
+      font-weight:800;color:#fff;cursor:pointer;background:linear-gradient(135deg,#0f766e,#0d9488)}
+    button:hover{filter:brightness(1.06)}
+    a.back{display:block;margin-top:16px;text-align:center;color:#94a3b8;font-size:13px;text-decoration:none}
+    a.back:hover{color:#e2e8f0}
+  </style>
+</head>
+<body>
+  <div class="lock-card">
+    <div class="brand">ML</div>
+    <h1>Admin Console</h1>
+    <p>This area is protected. Enter the admin token to continue.</p>
+    <div class="err" id="err">Invalid token. Please try again.</div>
+    <input id="tok" type="password" placeholder="Admin token" autocomplete="off" />
+    <button id="go" type="button">Unlock</button>
+    <a class="back" href="/">&larr; Back to main page</a>
+  </div>
+
+  <script>
+    // Production should use an "Authorization: Bearer <token>" header instead of a
+    // query-string token. For this demo, a verified token is stored in localStorage
+    // so the operator does not have to re-enter it on every visit.
+    var bad = {{ 'true' if bad_token else 'false' }};
+    var err = document.getElementById('err');
+    if (bad) {
+      // A token was supplied via the query string but rejected: clear any stale
+      // saved token and show the error WITHOUT auto-redirecting (avoids a loop).
+      err.style.display = 'block';
+      try { localStorage.removeItem('ADMIN_TOKEN'); } catch (e) {}
+    } else {
+      // No token in the URL: if one was saved after a previous successful unlock,
+      // reuse it once.
+      try {
+        var saved = localStorage.getItem('ADMIN_TOKEN');
+        if (saved) location.replace('/admin?token=' + encodeURIComponent(saved));
+      } catch (e) {}
+    }
+    function submit() {
+      var v = document.getElementById('tok').value.trim();
+      if (!v) return;
+      try { localStorage.setItem('ADMIN_TOKEN', v); } catch (e) {}
+      location.href = '/admin?token=' + encodeURIComponent(v);
+    }
+    document.getElementById('go').addEventListener('click', submit);
+    document.getElementById('tok').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') submit();
+    });
+  </script>
+</body>
+</html>

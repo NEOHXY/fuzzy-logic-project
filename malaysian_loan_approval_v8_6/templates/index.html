@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Malaysian Loan Approval System</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { ink:'#111827', muted:'#64748b', line:'#dbe4f0', panel:'#ffffff', appbg:'#f8fafc', sidebar:'#0f172a', accent:'#0f766e', accent2:'#0d9488' },
+        fontFamily: { sans:['Inter','sans-serif'] },
+        boxShadow: { card:'0 1px 3px rgba(15,23,42,.06), 0 18px 42px rgba(15,23,42,.04)' }
+      }}
+    };
+  </script>
+  <!-- Shared console chrome (sidebar, hero, card-box) is reused from the admin console -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}" />
+  <!-- Assessment-specific components (form, workflow, result card) load AFTER so they win on shared names -->
+  <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" />
+</head>
+<body class="bg-appbg text-ink antialiased min-h-screen">
+  <aside class="admin-sidebar fixed left-0 top-0 h-screen w-[260px] bg-sidebar text-white flex flex-col z-50">
+    <div class="px-6 py-6 border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="brand-mark">ML</div>
+        <div class="brand-copy">
+          <h1 class="text-base font-bold leading-tight tracking-tight">Malaysian Loan</h1>
+          <p class="text-xs text-slate-400 mt-0.5">Approval System</p>
+        </div>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Collapse sidebar" title="Collapse sidebar"><span class="material-symbols-outlined">chevron_left</span></button>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto px-3 py-5 space-y-1">
+      <button type="button" class="admin-nav active"><span class="nav-symbol material-symbols-outlined">fact_check</span><span><strong>Loan Assessment</strong><small>Evaluate applicant</small></span></button>
+    </nav>
+
+    <div class="px-3 pb-4 space-y-3">
+      <div class="infra-card">
+        <h2>System Status</h2>
+        <div class="infra-row"><span><i class="dot ok"></i>Fuzzy Engine</span><b>Ready</b></div>
+        <div class="infra-row model-version-row"><span><i class="dot ok"></i>Model Version</span><b data-model-version-label>{{ active_version_label }}</b></div>
+        <div class="infra-row"><span><i class="dot {{ 'ok' if ai_configured else 'warn' }}"></i>AI Reasoning</span><b>{{ 'Active' if ai_configured else 'Key needed' }}</b></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="app-main ml-[260px] min-h-screen flex flex-col min-w-0">
+    <main class="admin-shell flex-1 overflow-y-auto p-8 pt-8">
+      <div class="max-w-[1380px] mx-auto space-y-5">
+        <section class="page-hero compact">
+          <div>
+            <h1>Evaluate Applicant</h1>
+            <p>Assess applicant risk using financial data, CTOS evidence, fuzzy risk scoring, and a clear approval recommendation.</p>
+          </div>
+          <div class="hero-pills"><span><i></i>{{ llm_status }}</span><span><i></i>Fuzzy Engine</span><span class="model-version-pill"><i></i>Active <b data-model-version-label>{{ active_version_label }}</b></span></div>
+        </section>
+
+        <section class="card-box workflow-card">
+          <div class="card-headline">
+            <div><h2>Decision Workflow</h2><p>Five-step assessment pipeline from input checks to recommendation.</p></div>
+            <span class="process-status" id="processStatus">Ready</span>
+          </div>
+          <div class="process-line" id="processLine">
+            <div class="process-fill" id="processFill"></div>
+            <div class="process-step" data-step="0"><span>1</span><strong>Input Checked</strong></div>
+            <div class="process-step" data-step="1"><span>2</span><strong>CTOS Verified</strong></div>
+            <div class="process-step" data-step="2"><span>3</span><strong>Fuzzy Score</strong></div>
+            <div class="process-step" data-step="3"><span>4</span><strong>Explanation</strong></div>
+            <div class="process-step" data-step="4"><span>5</span><strong>Recommendation</strong></div>
+          </div>
+        </section>
+
+        <section class="card-box input-card">
+          <div class="card-headline">
+            <div><h2>Applicant Information</h2><p>Applicant profile and requested amount. Debt-to-Income Ratio is calculated automatically.</p></div>
+          </div>
+          <form id="loanForm" class="form-grid">
+            <label><span>Annual income (RM)</span><input name="income" type="number" min="1" step="any" value="65000" required /></label>
+            <label><span>CTOS credit score</span><input name="credit" type="number" min="300" max="850" step="1" value="720" required /></label>
+            <label><span>Requested Loan Amount (RM)</span><input name="loan_amount" type="number" min="0" step="any" value="11700" required /></label>
+            <label><span>Employment years</span><input name="emp" type="number" min="0" max="60" step="0.5" value="4" required /></label>
+            <label><span>Previous loan default</span><select name="default"><option>No</option><option>Yes</option></select></label>
+
+            <div class="ratio-preview" id="ratioPreview">
+              <div>
+                <span>Debt-to-Income Ratio</span>
+                <small>Auto-calculated from loan amount ÷ annual income. Keep between 0.00 and 1.00.</small>
+                <div class="field-warning" id="ratioWarning"></div>
+              </div>
+              <strong id="ratioValue">0.18</strong>
+            </div>
+
+            <div class="form-actions">
+              <button class="primary-btn" type="submit">Evaluate Applicant</button>
+              <button class="secondary-btn preset" data-preset="approve" type="button">Approve sample</button>
+              <button class="secondary-btn preset" data-preset="review" type="button">Review sample</button>
+              <button class="secondary-btn preset" data-preset="reject" type="button">Reject sample</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card-box result-card" id="resultCard">
+          <div class="empty-state">
+            <div class="empty-icon">↳</div>
+            <h2>Waiting for applicant input</h2>
+            <p>Click <b>Evaluate Applicant</b> to run the assessment workflow.</p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='sidebar.js') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

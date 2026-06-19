@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin · Malaysian Loan Approval System</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { ink:'#111827', muted:'#64748b', line:'#dbe4f0', panel:'#ffffff', appbg:'#f8fafc', sidebar:'#0f172a', accent:'#0f766e', accent2:'#0d9488' },
+        fontFamily: { sans:['Inter','sans-serif'] },
+        boxShadow: { card:'0 1px 3px rgba(15,23,42,.06), 0 18px 42px rgba(15,23,42,.04)' }
+      }}
+    };
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}" />
+</head>
+<body class="bg-appbg text-ink antialiased h-screen overflow-hidden">
+  <aside class="admin-sidebar fixed left-0 top-0 h-screen w-[260px] bg-sidebar text-white flex flex-col z-50">
+    <div class="px-6 py-6 border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="brand-mark">ML</div>
+        <div class="brand-copy">
+          <h1 class="text-base font-bold leading-tight tracking-tight">Malaysian Loan</h1>
+          <p class="text-xs text-slate-400 mt-0.5">Admin Console</p>
+        </div>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Collapse sidebar" title="Collapse sidebar"><span class="material-symbols-outlined">chevron_left</span></button>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto px-3 py-5 space-y-1">
+      <button type="button" class="admin-nav active" data-admin-section="ops"><span class="nav-symbol material-symbols-outlined">dashboard</span><span><strong>Overview</strong><small>Status</small></span></button>
+      <button type="button" class="admin-nav" data-admin-section="data"><span class="nav-symbol material-symbols-outlined">input</span><span><strong>Data Intake</strong><small>Upload & review</small></span></button>
+      <button type="button" class="admin-nav" data-admin-section="ga"><span class="nav-symbol material-symbols-outlined">monitoring</span><span><strong>GA Performance</strong><small>Training result</small></span></button>
+      <button type="button" class="admin-nav" data-admin-section="membership"><span class="nav-symbol material-symbols-outlined">schema</span><span><strong>Membership</strong><small>Fuzzy sets</small></span></button>
+      <button type="button" class="admin-nav" data-admin-section="versions"><span class="nav-symbol material-symbols-outlined">history</span><span><strong>Versions</strong><small>Rollback</small></span></button>
+    </nav>
+
+    <div class="px-3 pb-4 space-y-3">
+      <div class="infra-card">
+        <h2>Infrastructure</h2>
+        <div class="infra-row"><span>Storage</span><b>{{ 'GCS' if using_gcs else 'Local' }}</b></div>
+        <div class="infra-row"><span>Worker</span><b>Cloud Tasks</b></div>
+        <div class="infra-row"><span>Threshold</span><b>{{ threshold }} rows</b></div>
+        <div class="infra-row"><span>Admin Gate</span><b>{{ 'Open' if admin_open else 'Token' }}</b></div>
+      </div>
+      <a href="/" class="back-link"><span class="material-symbols-outlined text-[18px]">arrow_back</span> Back to Assessment</a>
+    </div>
+  </aside>
+
+  <div class="app-main ml-[260px] h-screen flex flex-col min-w-0">
+    <main class="admin-shell flex-1 overflow-y-auto p-8">
+      <div class="max-w-[1380px] mx-auto space-y-5">
+        <section class="page-hero compact">
+          <div>
+            <h1>Model Operations</h1>
+            <p>Manage labelled data, retraining, model versions, and rollback.</p>
+          </div>
+          <div class="hero-pills"><span><i></i>GCS</span><span id="cloudTaskPill"><i></i>Cloud Tasks</span><span><i></i>Blended Gate</span></div>
+        </section>
+
+        <section class="admin-section active" id="admin-section-ops">
+          <section class="monitor-card slim">
+            <div class="monitor-icon"><span class="material-symbols-outlined">model_training</span></div>
+            <div class="monitor-grid">
+              <div><p>State</p><b id="statusStateText">Idle</b><span class="process-status" id="statusPill">IDLE</span></div>
+              <div><p>Message</p><b id="statusMsg">Loading…</b></div>
+              <div><p>Current Job</p><b id="currentJobText">None</b></div>
+              <div><p>Last Updated</p><b id="lastUpdated">—</b></div>
+            </div>
+          </section>
+
+          <section class="metric-grid" id="adminMetrics"></section>
+
+          <section class="control-card clean">
+            <div>
+              <h2>Retraining</h2>
+              <p>Normal retraining is enabled only when at least {{ threshold }} clean rows are ready. Force retrain is an admin override.</p>
+            </div>
+            <div class="button-row">
+              <button class="btn-secondary" id="refreshBtn" type="button"><span class="material-symbols-outlined">refresh</span>Refresh</button>
+              <button class="btn-primary" id="retrainBtn" type="button"><span class="material-symbols-outlined">play_arrow</span>Retrain now</button>
+              <button class="btn-warning" id="forceRetrainBtn" type="button"><span class="material-symbols-outlined">warning</span>Force retrain</button>
+            </div>
+          </section>
+          <section class="agent-progress" id="agentProgress" aria-live="polite">
+            <div class="agent-progress-head"><b>Retraining Agent Workflow</b><span id="agentProgressText">Idle · waiting for clean rows</span></div>
+            <div class="agent-steps">
+              <span data-step="observe">Observe</span><span data-step="validate">Validate</span><span data-step="ga">Run GA</span><span data-step="evaluate">Evaluate</span><span data-step="act">Promote / Skip</span><span data-step="log">Write log</span>
+            </div>
+            <div class="agent-progress-bar"><i></i></div>
+          </section>
+        </section>
+
+        <section class="admin-section" id="admin-section-data">
+          <header class="section-title"><span>Data</span><h2>Data Intake</h2><p>Upload labelled historical records and review rejected rows.</p></header>
+          <section class="notice compact"><span class="material-symbols-outlined">verified_user</span>Retraining uses only admin-uploaded labelled CSV data.</section>
+
+          <section class="card-box">
+            <div class="card-headline"><div><h2>Upload Labelled CSV</h2><p>Required columns must match the training schema.</p></div></div>
+            <div class="code-chip-row"><code>person_income</code><code>credit_score</code><code>loan_percent_income</code><code>person_emp_exp</code><code>previous_loan_defaults_on_file</code><code>loan_status</code></div>
+            <div class="upload-zone" id="uploadZone">
+              <label for="csvFile" class="upload-label"><span class="material-symbols-outlined">upload_file</span><strong>Choose or drop CSV</strong><small id="fileName">No file selected</small></label>
+              <input type="file" id="csvFile" accept=".csv" />
+              <button class="btn-primary" id="uploadBtn" type="button">Upload & Validate</button>
+            </div>
+            <p class="helper-text" id="uploadMsg"></p>
+          </section>
+
+          <section class="two-col-grid">
+            <article class="card-box data-pool-card"><div class="card-headline"><div><h2>Queued Clean Rows</h2><p>Passed Gate 1 and waiting for the next retraining batch. <span id="pendingPreviewNote" class="preview-note"></span></p></div></div><div class="table-wrap"><table id="pendingTable"><thead><tr><th>Income</th><th>CTOS</th><th>Ratio</th><th>Employment</th><th>Default</th><th>Label</th></tr></thead><tbody></tbody></table></div></article>
+            <article class="card-box review-sticky-card"><div class="card-headline"><div><h2>Review Queue</h2><p>Approve or discard blocked rows. <span id="reviewPreviewNote" class="preview-note"></span></p></div></div><div id="reviewList" class="review-list"></div></article>
+          </section>
+        </section>
+
+        <section class="admin-section" id="admin-section-ga">
+          <header class="section-title with-action"><div><span>GA</span><h2>GA Performance</h2><p>Training convergence and optimised breakpoints. Promotion decisions are shown in Versions using the blended validation gate.</p></div><button class="btn-secondary" id="reloadGaBtn" type="button">Reload GA</button></header>
+          <section class="metric-grid" id="gaMetrics"></section>
+          <section class="card-box plot-card"><div class="card-headline"><div><h2>GA Convergence</h2><p>This chart shows the GA training objective, not production validation MSE. Use it to show convergence; use Versions to justify promote or skip decisions.</p></div></div><div id="gaChart" class="plot-box"></div></section>
+          <section class="card-box"><div class="card-headline"><div><h2>Optimised Breakpoints</h2><p>GA-tuned variables used by the fuzzy engine.</p></div></div><div id="breakpointTable" class="table-wrap"></div></section>
+        </section>
+
+        <section class="admin-section" id="admin-section-membership">
+          <header class="section-title"><span>Fuzzy Sets</span><h2>Membership Functions</h2><p>Inspect value-to-category mapping used by the engine.</p></header>
+          <section class="mf-filter-grid compact">
+            <button type="button" class="mf-filter active" data-view="all"><span>All</span><b>All Variables</b></button>
+            <button type="button" class="mf-filter" data-view="ga"><span>GA</span><b>GA-Tuned</b></button>
+            <button type="button" class="mf-filter" data-view="fixed"><span>Fixed</span><b>Fixed + Output</b></button>
+          </section>
+          <section class="card-box plot-card membership-plot-card"><div class="card-headline"><div><h2 id="membershipTitle">All Membership Functions</h2><p id="membershipSubtitle">Complete fuzzy system.</p></div></div><div id="membershipChart" class="plot-box tall membership-chart-box"></div></section>
+        </section>
+
+        <section class="admin-section" id="admin-section-versions">
+          <header class="section-title"><span>Versions</span><h2>Versions & Logs</h2><p>Rollback, download artifacts, and view update logs.</p></header>
+          <section class="notice compact version-explainer">
+            <span class="material-symbols-outlined">info</span>
+            <div><b>v0 is the baseline.</b> v1 and above are promoted retrained models. This tab separates the serving model from the audit trail, so rollback decisions are easier to understand.</div>
+          </section>
+          <section class="current-model-grid versions-summary-grid">
+            <article class="card-box compact"><span>Active Model</span><h3 id="currentVersionText">v0 baseline</h3><p id="currentModelSource">Serving model artifact</p></article>
+            <article class="card-box compact"><span>Rollback</span><h3 id="rollbackStatusText">Baseline available</h3><p><button class="mini" id="rollbackV0Btn" type="button">Rollback to v0</button></p></article>
+            <article class="card-box compact promotion-rule-card"><span>Promotion Rule</span><h3 id="currentPromotionText">Blended gate</h3><p>Promote only when blended MSE improves and anchor regression ≤ 1.08×.</p></article>
+            <article class="card-box compact danger-zone slim-danger"><span>Advanced</span><h3>Demo reset</h3><p><button class="mini bad" id="resetStateBtn" type="button">Reset demo data</button></p></article>
+          </section>
+          <section class="card-box rule-card"><div class="card-headline"><div><h2>Promotion Formula</h2><p>The system adapts to recent data while protecting the original validation distribution.</p></div></div><div class="formula-grid"><div><span>Blended MSE</span><b>0.6 × Anchor + 0.4 × Recent</b><small>Final promotion score</small></div><div><span>Anchor MSE</span><b>Old-distribution ruler</b><small>Displayed separately because it may regress slightly</small></div><div><span>Safety Guard</span><b>Anchor regression ≤ 1.08×</b><small>Prevents catastrophic forgetting</small></div></div></section>
+          <section class="card-box"><div class="card-headline"><div><h2>Model Versions</h2><p>Rollbackable promoted artifacts. Anchor MSE is shown separately from the blended promotion score.</p></div></div><div class="table-wrap clean-table"><table id="versionTable"><thead><tr><th>Version</th><th>Status</th><th>Promotion Score</th><th>Anchor MSE</th><th>Rows</th><th>Actions</th></tr></thead><tbody></tbody></table></div></section>
+          <section class="card-box"><div class="card-headline"><div><h2>Retraining History</h2><p>Summary view first; use Details to inspect anchor, recent, and blended metrics.</p></div></div><div class="table-wrap clean-table"><table id="historyTable" class="history-summary"><thead><tr><th>Time</th><th>Result</th><th>Version</th><th>Gate</th><th>Blended Change</th><th>Anchor Reg.</th><th>Rows</th><th>Reason</th><th>Details</th></tr></thead><tbody></tbody></table></div></section>
+          <section class="card-box audit-log-card"><details><summary>Raw Audit Log</summary><pre id="changelog" class="changelog">Waiting for retraining events...</pre></details></section>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="toastHost" class="toast-host" aria-live="polite"></div>
+  <script src="{{ url_for('static', filename='sidebar.js') }}"></script>
+  <script src="{{ url_for('static', filename='admin.js') }}"></script>
+</body>
+</html>
